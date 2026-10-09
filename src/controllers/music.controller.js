@@ -6,28 +6,6 @@ const jwt = require("jsonwebtoken");
 
 async function createMusic(req,res){
 
-    const token  =req.cookies.token;
-
-    if(!token){
-        res.status(401).json({
-            message : "Unauthorized"
-        })
-    }
-    
-    let decoded;
-    try { 
-        decoded = jwt.verify(token,process.env.JWT_SECRET);
-        if(decoded.role!='artist'){
-            res.status(403).json({
-                message : "You dont have access to create music"
-            })
-        }
-    } catch(err){
-        res.status(401).json({
-            message : "Unauthorized"
-        })
-    }
-
     const { title } = req.body;
     const file = req.file;
 
@@ -36,7 +14,7 @@ async function createMusic(req,res){
     const music = await musicModel.create({
         uri : result.url,
         title,
-        artist : decoded.id,
+        artist : req.user.id,
     })
 
     res.status(201).json({
@@ -52,38 +30,16 @@ async function createMusic(req,res){
 
 async function createAlbum(req,res){
 
-    const token = req.cookies.token;
+    const { title, musics } =  req.body;
 
-    if(!token){
-        res.status(401).json({
-            message : "Unauthorized"
-        })
-    }
-
-    let decoded;
-    try{
-        decoded=jwt.verify(token,process.env.JWT_SECRET)
-        if(decoded.role!='artist'){
-            res.status(403).json({
-                message : "You Dont have access to create music"
-            })
-        }
-    }catch (err){
-        return res.status(401).json({
-            message : "Unauthorized"
-        })
-    }
-
-    const { title, musicIds } =  req.body;
-
-    const ablum = await albumModel.create({
+    const album = await albumModel.create({
         title,
-        artist : decoded.id,
-        musics :  musicIds
+        artist : req.user.id,
+        musics :  musics
     })
 
     res.status(201).json({
-        message : "Album created successfully";
+        message : "Album created successfully",
         album :  {
             id : album._id,
             title : album.title,
@@ -93,4 +49,36 @@ async function createAlbum(req,res){
     })
 }
 
-module.exports = { createMusic, createAlbum };
+async function getAllMusic(req,res){
+    const musics= await musicModel
+    .find()
+    .skip(0)
+    .limit(10)
+    .populate("artist", "username email");
+
+    res.status(200).json({
+        message : "Music fetched succesfully",
+        musics : musics
+    })
+}
+
+async function getAlbums(req,res){
+    const albums = await albumModel.find().select("title artist").populate("artist","username email");
+
+    res.status(200).json({ 
+        message : "Albums fetched successfully",
+        albums : albums
+    })
+}
+
+async function getAlbumId(req,res){
+    const albumId=req.params.albumId;
+
+    const album = await albumModel.findById(albumId).populate("artist","username email");
+
+    return res.status(200).json({
+        message : "Album fetched successfully",
+        album : album
+    })
+}
+module.exports = { createMusic, createAlbum, getAllMusic, getAlbums, getAlbumId};
